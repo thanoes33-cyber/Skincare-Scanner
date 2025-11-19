@@ -1,0 +1,7 @@
+{
+  "name": "Skincare Scanner",
+  "description": "Scan produce and products to get a breakdown of their ingredients and nutrients, and receive a personalized analysis of their potential effects on your skin based on your unique profile.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
