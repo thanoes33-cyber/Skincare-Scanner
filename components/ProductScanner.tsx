@@ -1,4 +1,3 @@
-
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { SparklesIcon } from './icons/SparklesIcon';
 import { Spinner } from './Spinner';
@@ -13,12 +12,14 @@ import { VideoCameraIcon } from './icons/VideoCameraIcon';
 import { BoltIcon } from './icons/BoltIcon';
 import { BoltSlashIcon } from './icons/BoltSlashIcon';
 import { SunIcon } from './icons/SunIcon';
+import { MagnifyingGlassIcon } from './icons/MagnifyingGlassIcon';
 import { editProductImage } from '../services/geminiService';
 
 interface ProductScannerProps {
   productImage: File | null;
   setProductImage: (file: File | null) => void;
   onAnalyze: () => void;
+  onSearch: (query: string) => void;
   isLoading: boolean;
   onBarcodeDetected?: (code: string) => void;
 }
@@ -35,12 +36,13 @@ const dataURLtoFile = (dataurl: string, filename: string) => {
     return new File([u8arr], filename, {type:mime});
 };
 
-export const ProductScanner: React.FC<ProductScannerProps> = ({ productImage, setProductImage, onAnalyze, isLoading, onBarcodeDetected }) => {
+export const ProductScanner: React.FC<ProductScannerProps> = ({ productImage, setProductImage, onAnalyze, onSearch, isLoading, onBarcodeDetected }) => {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageMediaType, setImageMediaType] = useState<'image' | 'video'>('image');
   const [isScanning, setIsScanning] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
   
   // Mode state
   const [scanMode, setScanMode] = useState<'photo' | 'video'>('photo');
@@ -256,10 +258,6 @@ export const ProductScanner: React.FC<ProductScannerProps> = ({ productImage, se
     }
 
     // Pre-capture focus logic for sharper images
-    // We only trigger explicit focus if:
-    // 1. Continuous focus is NOT supported (so we must focus manually), OR
-    // 2. We want to force a lock anyway (optional, but helps in low light)
-    // If continuous focus IS supported, we trust it, but give a tiny delay for stability.
     try {
         if (!supportsContinuousFocusRef.current) {
             await triggerFocus();
@@ -745,6 +743,14 @@ export const ProductScanner: React.FC<ProductScannerProps> = ({ productImage, se
           setEditPrompt('');
       }
   };
+  
+  const handleSearchSubmit = (e: React.FormEvent) => {
+      e.preventDefault();
+      if(searchQuery.trim()) {
+          onSearch(searchQuery);
+          setSearchQuery('');
+      }
+  }
 
   const startScan = useCallback(async () => {
     if (isScanning || streamRef.current) return;
@@ -995,7 +1001,7 @@ export const ProductScanner: React.FC<ProductScannerProps> = ({ productImage, se
         </div>
       </div>
 
-      <div className="relative aspect-[4/3] w-full bg-black rounded-xl overflow-hidden shadow-inner group">
+      <div className="relative aspect-[4/3] w-full max-w-xl mx-auto bg-black rounded-xl overflow-hidden shadow-inner group">
         {!isScanning && !productImage && (
           <div className="absolute inset-0 flex flex-col items-center justify-center z-10">
              <QrCodeIcon className="h-20 w-20 text-gray-600 dark:text-gray-400 mb-4" />
@@ -1134,7 +1140,7 @@ export const ProductScanner: React.FC<ProductScannerProps> = ({ productImage, se
       </div>
 
       {/* Controls Area */}
-      <div className="mt-4 space-y-4 min-h-[60px]">
+      <div className="mt-4 space-y-4 min-h-[60px] max-w-xl mx-auto">
          {/* Zoom Slider */}
          {isScanning && zoomSupport && (
              <div className="flex items-center space-x-3 px-2 relative pt-4">
@@ -1193,7 +1199,7 @@ export const ProductScanner: React.FC<ProductScannerProps> = ({ productImage, se
                                 placeholder="e.g., Add a retro filter, remove background"
                                 value={editPrompt}
                                 onChange={(e) => setEditPrompt(e.target.value)}
-                                className="flex-grow px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-brand-green focus:outline-none"
+                                className="flex-grow px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-800 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-brand-green focus:outline-none"
                             />
                             <button 
                                 type="submit"
@@ -1315,6 +1321,34 @@ export const ProductScanner: React.FC<ProductScannerProps> = ({ productImage, se
                     }`}></div>
                 </button>
             </div>
+         )}
+
+         {/* Search by Name */}
+         {!isScanning && !productImage && (
+             <div className="mt-6 border-t border-gray-100 dark:border-gray-700 pt-4">
+                 <p className="text-center text-xs font-semibold text-gray-400 dark:text-gray-500 mb-3 uppercase tracking-wider">Or search by name</p>
+                 <form onSubmit={handleSearchSubmit} className="flex gap-2">
+                     <div className="relative flex-grow">
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <MagnifyingGlassIcon className="h-4 w-4 text-gray-400" />
+                        </div>
+                        <input 
+                             type="text" 
+                             placeholder="e.g., CeraVe Cleanser, Organic Apple" 
+                             value={searchQuery}
+                             onChange={(e) => setSearchQuery(e.target.value)}
+                             className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-brand-green focus:outline-none transition-all"
+                        />
+                     </div>
+                     <button 
+                         type="submit"
+                         disabled={!searchQuery.trim() || isLoading}
+                         className="px-4 py-2 bg-brand-green/10 text-brand-green dark:text-brand-green-light font-bold rounded-xl hover:bg-brand-green hover:text-white transition-all disabled:opacity-50 text-sm"
+                     >
+                         Search
+                     </button>
+                 </form>
+             </div>
          )}
       </div>
       

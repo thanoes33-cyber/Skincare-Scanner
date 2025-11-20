@@ -1,12 +1,12 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { AnalysisResult } from '../types';
 import { Spinner } from './Spinner';
 import { LeafIcon } from './icons/LeafIcon';
 import { CheckCircleIcon } from './icons/CheckCircleIcon';
 import { ExclamationTriangleIcon } from './icons/ExclamationTriangleIcon';
 import { InformationCircleIcon } from './icons/InformationCircleIcon';
-import { searchProductWeb } from '../services/geminiService';
+import { searchProductWeb, findProductImage } from '../services/geminiService';
 import { MagnifyingGlassIcon } from './icons/MagnifyingGlassIcon';
 import { ShareIcon } from './icons/ShareIcon';
 import { ShareModal } from './ShareModal';
@@ -34,6 +34,19 @@ export const AnalysisDisplay: React.FC<AnalysisDisplayProps> = ({ result, isLoad
   const [searchResult, setSearchResult] = useState<{ text: string; groundingMetadata: any } | null>(null);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  
+  const [webImage, setWebImage] = useState<string | null>(null);
+  const [imgError, setImgError] = useState(false);
+
+  useEffect(() => {
+      if (result?.productName) {
+          setWebImage(null);
+          setImgError(false);
+          findProductImage(result.productName).then(url => {
+              if (url) setWebImage(url);
+          });
+      }
+  }, [result?.productName]);
 
   const handleWebSearch = async () => {
       if (!result?.productName) return;
@@ -99,6 +112,22 @@ export const AnalysisDisplay: React.FC<AnalysisDisplayProps> = ({ result, isLoad
                  <ShareIcon className="h-6 w-6" />
              </button>
         </div>
+        
+        {webImage && !imgError && (
+            <div className="flex justify-center mb-6 animate-fade-in">
+                <div className="relative group">
+                    <img 
+                        src={webImage} 
+                        alt={result.productName} 
+                        className="h-40 w-40 object-contain rounded-xl bg-white border border-gray-100 dark:border-gray-700 shadow-sm"
+                        onError={() => setImgError(true)}
+                    />
+                    <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-[10px] text-center py-0.5 opacity-0 group-hover:opacity-100 transition-opacity rounded-b-xl">
+                        Web Image
+                    </div>
+                </div>
+            </div>
+        )}
 
         <h2 className="text-3xl font-bold text-brand-green-dark dark:text-brand-green text-center pr-10 pl-10">{result.productName}</h2>
         

@@ -13,12 +13,16 @@ import { TrashIcon } from './icons/TrashIcon';
 import { MagnifyingGlassIcon } from './icons/MagnifyingGlassIcon';
 import { XMarkIcon } from './icons/XMarkIcon';
 import { StarIcon } from './icons/StarIcon';
-import { analyzeProduct, getIngredientInfo } from '../services/geminiService';
+import { UserCircleIcon } from './icons/UserCircleIcon';
+import { analyzeProduct, analyzeTextProduct, getIngredientInfo, findProductImage, searchProductSelections } from '../services/geminiService';
 import { GlossaryModal } from './GlossaryModal';
+import { AccountSettingsModal } from './AccountSettingsModal';
+import { ProductSelectionModal } from './ProductSelectionModal';
 
 interface DashboardProps {
   user: User;
   onLogout: () => void;
+  onUpdateUser: (user: User) => void;
   isDarkMode: boolean;
   toggleTheme: () => void;
 }
@@ -73,7 +77,7 @@ const generateThumbnail = (file: File): Promise<string> => {
     });
 };
 
-export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, isDarkMode, toggleTheme }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, onUpdateUser, isDarkMode, toggleTheme }) => {
   const [userProfile, setUserProfile] = useState<UserProfile>(() => {
     try {
       const savedProfile = localStorage.getItem(`userProfile_${user.email}`);
@@ -86,12 +90,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, isDarkMode
 
   const [history, setHistory] = useState<ScanHistoryItem[]>([]);
   const [activities, setActivities] = useState<ActivityItem[]>([]);
+  const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
 
   // Filter states
+  const [historyTab, setHistoryTab] = useState<'all' | 'favorites'>('all');
   const [filterName, setFilterName] = useState('');
   const [filterStartDate, setFilterStartDate] = useState('');
   const [filterEndDate, setFilterEndDate] = useState('');
-  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   
   // Analysis state
   const [productImage, setProductImage] = useState<File | null>(null);
@@ -99,6 +104,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, isDarkMode
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
+  
+  // Search Selection State
+  const [isSelectionModalOpen, setIsSelectionModalOpen] = useState(false);
+  const [productSelections, setProductSelections] = useState<string[]>([]);
+  const [currentSearchQuery, setCurrentSearchQuery] = useState('');
 
   useEffect(() => {
     try {
@@ -108,28 +118,28 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, isDarkMode
     }
   }, [userProfile, user.email]);
 
-  // Centralized logic to limit history size
+  // Centralized logic to limit history size to strict 50 items for favorites
+  // and reasonable limit for total items
   const enforceHistoryLimit = useCallback((items: ScanHistoryItem[]) => {
-    // If we are within limits, return as is
-    if (items.length <= 50) return items;
+    // 1. Sort all by timestamp desc first to ensure we process newest first
+    const sorted = [...items].sort((a, b) => b.timestamp - a.timestamp);
+    
+    // Separate favorites and others
+    const favorites = sorted.filter(i => i.favorite);
+    const others = sorted.filter(i => !i.favorite);
 
-    // Separate favorites and standard items
-    // Note: Assumes items are roughly sorted or we don't care about sort order for favorites specifically
-    const favorites = items.filter(i => i.favorite);
-    const others = items.filter(i => !i.favorite);
+    // STRICT LIMIT: Favorites can only have 50 items max.
+    // If user tries to add more, the oldest favorites are removed or un-favorited (removed here implies un-favorited effectively if dropped from list entirely, but realistically we drop from history).
+    // In this implementation, we keep the newest 50 favorites.
+    const keptFavorites = favorites.slice(0, 50);
     
-    // We want max 50 items total. 
-    // Prioritize favorites: If favorites >= 50, we keep all favorites (user intent) but remove all others.
-    // If favorites < 50, we fill the remaining slots with the newest non-favorites.
-    
-    const slotsForOthers = Math.max(0, 50 - favorites.length);
-    
-    // Since 'items' usually comes in sorted (newest first), 'others' preserves that order.
-    // Slicing gives us the newest ones.
-    const keptOthers = others.slice(0, slotsForOthers);
-    
-    // Re-combine and re-sort by timestamp to be clean
-    return [...favorites, ...keptOthers].sort((a, b) => b.timestamp - a.timestamp);
+    // Also limit total history to prevent storage issues (e.g., 100 items total)
+    // We prioritize keeping favorites.
+    const remainingSlots = 100 - keptFavorites.length;
+    const keptOthers = others.slice(0, Math.max(0, remainingSlots));
+
+    // Combine and resort
+    return [...keptFavorites, ...keptOthers].sort((a, b) => b.timestamp - a.timestamp);
   }, []);
 
   useEffect(() => {
@@ -137,7 +147,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, isDarkMode
           const savedHistory = localStorage.getItem(`skincare_history_${user.email}`);
           if (savedHistory) {
               const parsed = JSON.parse(savedHistory);
-              // Apply limit on load to ensure consistency even if data was modified externally
               setHistory(enforceHistoryLimit(parsed));
           }
           const savedActivities = localStorage.getItem(`skincare_activities_${user.email}`);
@@ -158,13 +167,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, isDarkMode
 
   const filteredHistory = useMemo(() => {
       return history.filter(item => {
+          // Tab Filter
+          if (historyTab === 'favorites' && !item.favorite) return false;
+
           // Name filter
           const matchesName = item.productName.toLowerCase().includes(filterName.toLowerCase());
           
           // Date filter
           let matchesStart = true;
           if (filterStartDate) {
-              // Correctly parse YYYY-MM-DD to local time 00:00
               const [y, m, d] = filterStartDate.split('-').map(Number);
               const start = new Date(y, m - 1, d, 0, 0, 0, 0);
               matchesStart = item.timestamp >= start.getTime();
@@ -172,24 +183,19 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, isDarkMode
 
           let matchesEnd = true;
           if (filterEndDate) {
-               // Correctly parse YYYY-MM-DD to local time 23:59:59.999
               const [y, m, d] = filterEndDate.split('-').map(Number);
               const end = new Date(y, m - 1, d, 23, 59, 59, 999);
               matchesEnd = item.timestamp <= end.getTime();
           }
           
-          // Favorite filter
-          const matchesFav = showFavoritesOnly ? item.favorite : true;
-
-          return matchesName && matchesStart && matchesEnd && matchesFav;
+          return matchesName && matchesStart && matchesEnd;
       });
-  }, [history, filterName, filterStartDate, filterEndDate, showFavoritesOnly]);
+  }, [history, filterName, filterStartDate, filterEndDate, historyTab]);
 
   const clearFilters = () => {
       setFilterName('');
       setFilterStartDate('');
       setFilterEndDate('');
-      setShowFavoritesOnly(false);
   };
 
   const [selectedIngredient, setSelectedIngredient] = useState<string | null>(null);
@@ -197,10 +203,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, isDarkMode
   const [isGlossaryLoading, setIsGlossaryLoading] = useState<boolean>(false);
   const [glossaryError, setGlossaryError] = useState<string>('');
 
-  const saveToHistory = async (result: AnalysisResult, file: File) => {
+  const saveToHistory = async (result: AnalysisResult, source: File | string) => {
       try {
-          const thumbnail = await generateThumbnail(file);
-          // Robust ID generation fallback
+          let thumbnail = '';
+          if (source instanceof File) {
+            thumbnail = await generateThumbnail(source);
+          } else {
+            thumbnail = source; // Assume it's a URL string for text searches
+          }
+          
           const id = typeof crypto !== 'undefined' && crypto.randomUUID 
             ? crypto.randomUUID() 
             : Date.now().toString(36) + Math.random().toString(36).substr(2);
@@ -216,21 +227,17 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, isDarkMode
           
           setHistory(prev => {
               let updated = [newItem, ...prev];
-              
-              // Apply the limit logic using the shared helper
               updated = enforceHistoryLimit(updated);
-
-              // Safe LocalStorage Save
               try {
                   localStorage.setItem(`skincare_history_${user.email}`, JSON.stringify(updated));
               } catch (e) {
-                  console.warn("LocalStorage quota exceeded. Trimming history further.");
-                  // Emergency trim if strictly needed
+                  console.warn("LocalStorage quota exceeded.", e);
+                  // Drastic fallback if quota exceeded
                   updated = updated.slice(0, 20);
                   try {
                       localStorage.setItem(`skincare_history_${user.email}`, JSON.stringify(updated));
                   } catch (retryError) {
-                      console.error("Critical: Failed to save history to localStorage", retryError);
+                      console.error("Critical: Failed to save history", retryError);
                   }
               }
               return updated;
@@ -240,7 +247,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, isDarkMode
           const activityItem: ActivityItem = {
             id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(),
             type: 'scan',
-            title: `Scanned: ${result.productName}`,
+            title: `Analyzed: ${result.productName}`,
             details: `Ingredients analyzed: ${result.ingredients.length}. Skin Impact: ${result.skinAnalysis.summary.substring(0, 60)}...`,
             timestamp: Date.now(),
             durationMinutes: 0
@@ -261,26 +268,39 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, isDarkMode
       }
   };
 
-  const deleteHistoryItem = (id: string, e: React.MouseEvent) => {
-      e.stopPropagation();
-      setHistory(prev => {
-          const updated = prev.filter(item => item.id !== id);
-          localStorage.setItem(`skincare_history_${user.email}`, JSON.stringify(updated));
-          return updated;
-      });
+  const deleteHistoryItem = (id: string, e: React.MouseEvent | React.TouchEvent) => {
+      e.stopPropagation(); // Always stop propagation first
+      e.preventDefault();
+      
+      if (window.confirm("Are you sure you want to delete this item permanently?")) {
+          setHistory(prev => {
+              const updated = prev.filter(item => item.id !== id);
+              localStorage.setItem(`skincare_history_${user.email}`, JSON.stringify(updated));
+              return updated;
+          });
+      }
   };
 
-  const toggleFavorite = (id: string, e: React.MouseEvent) => {
-      e.stopPropagation();
+  const toggleFavorite = (id: string, e: React.MouseEvent | React.TouchEvent) => {
+      e.stopPropagation(); // Always stop propagation first
+      e.preventDefault();
+      
       setHistory(prev => {
+          const itemToToggle = prev.find(item => item.id === id);
+          // If currently not favorite, check limit before adding
+          if (itemToToggle && !itemToToggle.favorite) {
+              const currentFavoritesCount = prev.filter(i => i.favorite).length;
+              if (currentFavoritesCount >= 50) {
+                  alert("You can only have up to 50 favorites. Please remove some favorites before adding more.");
+                  return prev;
+              }
+          }
+
           let updated = prev.map(item => 
             item.id === id ? { ...item, favorite: !item.favorite } : item
           );
           
-          // Re-run enforcement. This handles the edge case where an item is unfavorited,
-          // and if we were over capacity (e.g. >50 favorites), we should now trim the newly non-favorited item if needed.
-          updated = enforceHistoryLimit(updated);
-
+          updated = enforceHistoryLimit(updated); 
           localStorage.setItem(`skincare_history_${user.email}`, JSON.stringify(updated));
           return updated;
       });
@@ -317,6 +337,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, isDarkMode
     });
   };
 
+  const handleEditActivity = (updatedItem: ActivityItem) => {
+    setActivities(prev => {
+        const updated = prev.map(item => item.id === updatedItem.id ? updatedItem : item);
+        localStorage.setItem(`skincare_activities_${user.email}`, JSON.stringify(updated));
+        return updated;
+    });
+  };
+
   const handleDeleteActivity = (id: string) => {
       setActivities(prev => {
           const updated = prev.filter(a => a.id !== id);
@@ -340,7 +368,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, isDarkMode
     setAnalysisResult(null);
 
     try {
-      // Pass the scanContext (barcode) to the AI service
       const result = await analyzeProduct(productImage, userProfile, scanContext);
       setAnalysisResult(result);
       await saveToHistory(result, productImage);
@@ -354,6 +381,59 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, isDarkMode
       setIsLoading(false);
     }
   }, [productImage, userProfile, scanContext]);
+
+  // 1. Trigger search for selections
+  const handleSearch = useCallback(async (query: string) => {
+      setIsLoading(true);
+      setError('');
+      setAnalysisResult(null);
+      setProductImage(null);
+      setCurrentSearchQuery(query);
+      
+      try {
+          // Step 1: Find product selections
+          const options = await searchProductSelections(query);
+          setProductSelections(options);
+          setIsSelectionModalOpen(true);
+      } catch (e) {
+          if (e instanceof Error) {
+            setError(e.message);
+          } else {
+            setError('Failed to search for products.');
+          }
+      } finally {
+          setIsLoading(false);
+      }
+  }, []);
+
+  // 2. Confirm selection and analyze
+  const handleProductSelect = useCallback(async (productName: string) => {
+      setIsSelectionModalOpen(false);
+      setIsLoading(true);
+      setError('');
+      setAnalysisResult(null);
+      setProductImage(null);
+      
+      try {
+          // Step 2: Analyze the specific selected product
+          const result = await analyzeTextProduct(productName, userProfile);
+          setAnalysisResult(result);
+
+          // Step 3: Try to find an image URL for the history thumbnail
+          const imageUrl = await findProductImage(productName);
+          
+          // Step 4: Save to history
+          await saveToHistory(result, imageUrl || '');
+      } catch (e) {
+           if (e instanceof Error) {
+            setError(e.message);
+          } else {
+            setError('Failed to analyze product.');
+          }
+      } finally {
+          setIsLoading(false);
+      }
+  }, [userProfile]);
 
   const handleViewIngredient = useCallback(async (ingredientName: string) => {
     setSelectedIngredient(ingredientName);
@@ -376,12 +456,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, isDarkMode
     setGlossaryError('');
   };
 
-  const hasFilters = filterName || filterStartDate || filterEndDate || showFavoritesOnly;
+  const hasFilters = filterName || filterStartDate || filterEndDate;
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 font-sans text-brand-gray-dark dark:text-gray-200 transition-colors duration-200">
       <header className="bg-white dark:bg-gray-800 shadow-sm sticky top-0 z-10 transition-colors duration-200">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between">
             <div className="flex items-center">
                 <LeafIcon className="h-8 w-8 text-brand-green" />
                 <h1 className="ml-3 text-2xl sm:text-3xl font-bold text-brand-green-dark dark:text-white tracking-tight">
@@ -396,10 +476,32 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, isDarkMode
                 >
                     {isDarkMode ? <SunIcon className="h-6 w-6" /> : <MoonIcon className="h-6 w-6" />}
                 </button>
-                <span className="hidden sm:inline text-sm text-brand-gray dark:text-gray-400 font-medium">Hello, {user.name}</span>
+                
+                <div 
+                  className="flex items-center space-x-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 p-2 rounded-lg transition-colors"
+                  onClick={() => setIsAccountModalOpen(true)}
+                  title="Edit Profile"
+                >
+                  <div className="w-8 h-8 rounded-full overflow-hidden bg-gray-200 dark:bg-gray-600 border border-gray-300 dark:border-gray-500">
+                    {user.photo ? (
+                      <img src={user.photo} alt="Profile" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-gray-500">
+                        <UserCircleIcon className="w-6 h-6" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="hidden sm:block text-left">
+                    <p className="text-sm font-bold text-brand-gray-dark dark:text-white leading-none">{user.firstName}</p>
+                    <p className="text-[10px] text-brand-gray dark:text-gray-400 leading-tight">
+                        {user.subscriptionStatus === 'Active' ? 'Online' : 'Offline'}
+                    </p>
+                  </div>
+                </div>
+
                 <button 
                     onClick={onLogout}
-                    className="text-sm font-semibold text-red-500 hover:text-red-700 transition-colors"
+                    className="text-sm font-semibold text-red-500 hover:text-red-700 transition-colors border border-red-200 dark:border-red-900/30 px-3 py-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/10"
                 >
                     Log Out
                 </button>
@@ -418,6 +520,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, isDarkMode
                 <ActivityTracker 
                     activities={activities} 
                     onAddActivity={handleAddActivity} 
+                    onEditActivity={handleEditActivity}
                     onDeleteActivity={handleDeleteActivity} 
                 />
             </div>
@@ -429,6 +532,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, isDarkMode
               productImage={productImage}
               setProductImage={setProductImage}
               onAnalyze={handleAnalyze}
+              onSearch={handleSearch}
               isLoading={isLoading}
               onBarcodeDetected={handleBarcodeDetected}
             />
@@ -440,48 +544,58 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, isDarkMode
                 onViewIngredient={handleViewIngredient}
              />
 
+            {/* Tabbed History Section */}
             {history.length > 0 && (
                 <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-lg transition-colors duration-200">
-                    <div className="flex items-center justify-between mb-4">
-                         <h3 className="text-xl font-bold text-brand-gray-dark dark:text-white flex items-center">
-                            <ClockIcon className="h-6 w-6 mr-2 text-brand-green" />
-                            Recent Scans
-                        </h3>
-                        <button
-                            onClick={clearAllHistory}
-                            className="text-xs font-medium text-red-500 hover:text-red-700 hover:underline transition-colors"
-                        >
-                            Clear History
-                        </button>
+                    <div className="flex items-center justify-between mb-6">
+                         <div className="flex space-x-6">
+                            <button
+                                onClick={() => setHistoryTab('all')}
+                                className={`text-lg font-bold flex items-center pb-2 border-b-2 transition-all duration-200 ${
+                                    historyTab === 'all' 
+                                    ? 'text-brand-green border-brand-green' 
+                                    : 'text-gray-400 border-transparent hover:text-gray-600 dark:hover:text-gray-300'
+                                }`}
+                            >
+                                <ClockIcon className={`h-5 w-5 mr-2 ${historyTab === 'all' ? 'text-brand-green' : 'text-gray-400'}`} />
+                                Recent Scans
+                            </button>
+                            <button
+                                onClick={() => setHistoryTab('favorites')}
+                                className={`text-lg font-bold flex items-center pb-2 border-b-2 transition-all duration-200 ${
+                                    historyTab === 'favorites' 
+                                    ? 'text-brand-green border-brand-green' 
+                                    : 'text-gray-400 border-transparent hover:text-gray-600 dark:hover:text-gray-300'
+                                }`}
+                            >
+                                <StarIcon filled={true} className={`h-5 w-5 mr-2 ${historyTab === 'favorites' ? 'text-brand-green' : 'text-gray-400'}`} />
+                                My Favorites
+                            </button>
+                        </div>
+                        {historyTab === 'all' && (
+                            <button
+                                onClick={clearAllHistory}
+                                className="text-xs font-medium text-red-500 hover:text-red-700 hover:underline transition-colors"
+                            >
+                                Clear All
+                            </button>
+                        )}
                     </div>
                     
                     {/* Filters */}
                     <div className="mb-4 space-y-3 bg-gray-50 dark:bg-gray-700/30 p-3 rounded-xl">
-                        <div className="flex flex-col sm:flex-row gap-2">
-                            <div className="relative flex-grow">
-                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <MagnifyingGlassIcon className="h-4 w-4 text-gray-400" />
-                                </div>
-                                <input
-                                    type="text"
-                                    placeholder="Filter items..."
-                                    aria-label="Filter by product name"
-                                    value={filterName}
-                                    onChange={(e) => setFilterName(e.target.value)}
-                                    className="block w-full pl-10 pr-3 py-2 text-sm border border-gray-200 dark:border-gray-600 rounded-lg leading-5 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-brand-green focus:border-brand-green transition-colors"
-                                />
+                        <div className="relative w-full">
+                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <MagnifyingGlassIcon className="h-4 w-4 text-gray-400" />
                             </div>
-                            <button
-                                onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
-                                className={`px-3 py-2 rounded-lg text-sm font-medium flex items-center justify-center transition-colors border ${
-                                    showFavoritesOnly 
-                                    ? 'bg-yellow-50 border-yellow-300 text-yellow-700 dark:bg-yellow-900/20 dark:border-yellow-700 dark:text-yellow-400' 
-                                    : 'bg-white border-gray-200 text-gray-600 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600'
-                                }`}
-                            >
-                                <StarIcon filled={showFavoritesOnly} className={`h-4 w-4 mr-1.5 ${showFavoritesOnly ? 'text-yellow-500' : 'text-gray-400'}`} />
-                                Favorites
-                            </button>
+                            <input
+                                type="text"
+                                placeholder="Search items..."
+                                aria-label="Filter by product name"
+                                value={filterName}
+                                onChange={(e) => setFilterName(e.target.value)}
+                                className="block w-full pl-10 pr-3 py-2 text-sm border border-gray-200 dark:border-gray-600 rounded-lg leading-5 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-brand-green focus:border-brand-green transition-colors"
+                            />
                         </div>
                         <div className="flex flex-col sm:flex-row gap-2">
                             <input
@@ -515,7 +629,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, isDarkMode
                     <div className="space-y-3 max-h-[400px] overflow-y-auto pr-1 custom-scrollbar">
                         {filteredHistory.length === 0 ? (
                             <p className="text-center text-gray-500 dark:text-gray-400 text-sm py-8">
-                                {hasFilters ? 'No scans match your filters.' : 'No scan history yet.'}
+                                {historyTab === 'favorites' 
+                                    ? (hasFilters ? 'No favorite scans match your filters.' : 'No favorites yet. Star an item to add it here!') 
+                                    : (hasFilters ? 'No scans match your filters.' : 'No scan history yet.')}
                             </p>
                         ) : (
                             filteredHistory.map(item => (
@@ -533,42 +649,76 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout, isDarkMode
                                             </div>
                                         )}
                                     </div>
-                                    <div className="ml-4 flex-grow min-w-0 pr-12">
+                                    <div className="ml-4 flex-grow min-w-0 pr-24 sm:pr-20">
                                         <h4 className="text-sm font-bold text-brand-gray-dark dark:text-white truncate">{item.productName}</h4>
                                         <p className="text-xs text-brand-gray dark:text-gray-400 mt-1">
                                             {new Date(item.timestamp).toLocaleDateString()} &bull; {new Date(item.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                                         </p>
                                     </div>
-                                    <div className="flex items-center space-x-1 absolute right-3 top-1/2 -translate-y-1/2">
+                                    <div 
+                                        className="flex items-center space-x-2 absolute right-3 top-1/2 -translate-y-1/2 z-30"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          e.preventDefault();
+                                        }}
+                                        onMouseDown={(e) => e.stopPropagation()}
+                                        onMouseUp={(e) => e.stopPropagation()}
+                                        onTouchStart={(e) => e.stopPropagation()}
+                                        onTouchEnd={(e) => e.stopPropagation()}
+                                    >
                                          <button 
+                                            type="button"
                                             onClick={(e) => toggleFavorite(item.id, e)}
-                                            className={`p-2 rounded-full transition-colors ${
+                                            className={`p-2.5 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-yellow-400 ${
                                                 item.favorite 
                                                 ? 'text-yellow-400 hover:bg-yellow-50 dark:hover:bg-yellow-900/20' 
                                                 : 'text-gray-300 hover:text-yellow-400 hover:bg-gray-200 dark:hover:bg-gray-600'
                                             }`}
-                                            title={item.favorite ? "Unfavorite" : "Favorite"}
+                                            title={item.favorite ? "Remove from Favorites" : "Add to Favorites"}
                                         >
-                                            <StarIcon filled={item.favorite} className="h-5 w-5" />
+                                            <StarIcon filled={item.favorite} className="h-5 w-5 pointer-events-none" />
                                         </button>
                                         <button 
+                                            type="button"
                                             onClick={(e) => deleteHistoryItem(item.id, e)}
-                                            className="p-2 rounded-full text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
-                                            title="Delete"
+                                            className="p-2.5 rounded-full text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-red-500"
+                                            title="Delete Item"
                                         >
-                                            <TrashIcon className="h-4 w-4" />
+                                            <TrashIcon className="h-5 w-5 pointer-events-none" />
                                         </button>
                                     </div>
                                 </div>
                             ))
                         )}
                     </div>
+                    {historyTab === 'favorites' && filteredHistory.length > 0 && (
+                         <p className="text-[10px] text-gray-400 text-center mt-3">
+                             Favorites list is limited to 50 items.
+                         </p>
+                    )}
                 </div>
             )}
           </div>
         </div>
       </main>
       
+      {isAccountModalOpen && (
+        <AccountSettingsModal 
+            user={user} 
+            onSave={onUpdateUser} 
+            onClose={() => setIsAccountModalOpen(false)} 
+        />
+      )}
+
+      {/* Product Selection Modal */}
+      <ProductSelectionModal
+         isOpen={isSelectionModalOpen}
+         onClose={() => setIsSelectionModalOpen(false)}
+         selections={productSelections}
+         onSelect={handleProductSelect}
+         query={currentSearchQuery}
+      />
+
       {selectedIngredient && (
         <GlossaryModal
           ingredientName={selectedIngredient}

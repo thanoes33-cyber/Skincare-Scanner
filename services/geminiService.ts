@@ -131,6 +131,88 @@ export const analyzeProduct = async (mediaFile: File, userProfile: UserProfile, 
   }
 };
 
+export const analyzeTextProduct = async (productName: string, userProfile: UserProfile) => {
+  if (!process.env.API_KEY) {
+    throw new Error("API key is not configured.");
+  }
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
+  const prompt = `You are a nutritional and dermatological expert. Analyze the following product: "${productName}".
+  1. Identify the product (specific skincare item or type of produce/food) definitively.
+  2. List its key ingredients (for packaged goods) or main nutritional components (for produce/whole foods).
+  3. Based on the following user profile, explain the potential positive and negative effects of this item on their skin.
+  4. Check for any product recalls associated with this specific item or brand within the last year.
+
+  User Profile:
+  - Skin Type: ${userProfile.skinType}
+  - Skin Concerns: ${userProfile.skinConcerns.join(', ')}
+  - Health Conditions/Allergies: ${userProfile.healthConditions || 'None specified'}
+  - Specific Ingredient Sensitivities: ${
+    Object.entries(userProfile.ingredientSensitivities).length > 0
+    ? Object.entries(userProfile.ingredientSensitivities)
+        .map(([ingredient, level]) => `${ingredient} (${level} sensitivity)`)
+        .join(', ')
+    : 'None specified'
+  }
+
+  Provide your analysis in the specified JSON format. Pay close attention to the user's sensitivities when generating the 'negativeEffects' list.`;
+
+  try {
+    const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: { parts: [{text: prompt}] },
+        config: {
+            responseMimeType: 'application/json',
+            responseSchema: analysisSchema
+            // Note: googleSearch tool is excluded here because it cannot be used simultaneously with responseSchema.
+        }
+    });
+
+    const jsonText = response.text.trim();
+    return JSON.parse(jsonText);
+  } catch (error) {
+    console.error("Error analyzing product by text:", error);
+    throw new Error("Failed to analyze the product. Please check the name and try again.");
+  }
+};
+
+export const searchProductSelections = async (query: string): Promise<string[]> => {
+  if (!process.env.API_KEY) throw new Error("API key is not configured.");
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: `Perform a Google Search for "${query}".
+      Based on the search results, identify 10 distinct, specific, and relevant product names that the user might be looking for.
+      Focus on precise product titles (e.g., "CeraVe Foaming Facial Cleanser" instead of just "CeraVe").
+      Return ONLY a raw JSON array of strings. Do not use Markdown formatting.
+      Example: ["Product A", "Product B", "Product C"]`,
+      config: {
+        tools: [{ googleSearch: {} }]
+      }
+    });
+
+    const text = response.text || '';
+    // Clean up any markdown code blocks if present
+    const cleanText = text.replace(/```json/g, '').replace(/```/g, '').trim();
+    
+    try {
+        const json = JSON.parse(cleanText);
+        if (Array.isArray(json)) {
+            return json.slice(0, 10); // Ensure max 10
+        }
+        return [];
+    } catch (e) {
+        console.warn("Failed to parse search selections JSON", e);
+        return [];
+    }
+  } catch (error) {
+    console.error("Error searching product selections:", error);
+    throw new Error("Failed to search for products.");
+  }
+};
+
 const glossarySchema = {
   type: Type.OBJECT,
   properties: {
@@ -217,5 +299,33 @@ export const searchProductWeb = async (query: string) => {
   } catch (error) {
     console.error("Error searching web:", error);
     throw new Error("Failed to search the web.");
+  }
+};
+
+export const findProductImage = async (productName: string) => {
+  if (!process.env.API_KEY) throw new Error("API key is not configured.");
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: `Find a public image URL for "${productName}".
+      Prefer a clean, white-background product shot if available.
+      Return ONLY the raw URL string. Do not use Markdown.
+      Example: https://example.com/image.jpg`,
+      config: {
+        tools: [{ googleSearch: {} }]
+      }
+    });
+
+    const text = response.text?.trim();
+    // Basic validation to ensure it looks like a URL and not a sentence
+    if (text && text.startsWith('http') && !text.includes(' ')) {
+        return text;
+    }
+    return null;
+  } catch (error) {
+    console.error("Error finding product image:", error);
+    return null;
   }
 };

@@ -75,10 +75,10 @@ export const UserProfileForm: React.FC<UserProfileFormProps> = ({ userProfile, s
               <button
                 key={type}
                 onClick={() => setLocalProfile(p => ({ ...p, skinType: type }))}
-                className={`px-3 py-2 text-sm font-medium rounded-full transition-colors duration-200 ${
+                className={`px-3 py-2 text-sm font-medium rounded-full transition-colors duration-200 border ${
                   localProfile.skinType === type
-                    ? 'bg-brand-green text-white shadow'
-                    : 'bg-gray-100 dark:bg-gray-700 text-brand-gray-dark dark:text-gray-300 hover:bg-brand-green-light dark:hover:bg-gray-600'
+                    ? 'bg-brand-green text-white border-brand-green shadow'
+                    : 'bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-brand-gray-dark dark:text-gray-300 hover:border-brand-green hover:text-brand-green'
                 }`}
               >
                 {type}
@@ -94,10 +94,10 @@ export const UserProfileForm: React.FC<UserProfileFormProps> = ({ userProfile, s
               <button
                 key={concern}
                 onClick={() => handleConcernToggle(concern)}
-                className={`px-4 py-1.5 text-sm font-medium rounded-full transition-colors duration-200 ${
+                className={`px-4 py-1.5 text-sm font-medium rounded-full transition-colors duration-200 border ${
                   localProfile.skinConcerns.includes(concern)
-                    ? 'bg-brand-green text-white shadow'
-                    : 'bg-gray-100 dark:bg-gray-700 text-brand-gray-dark dark:text-gray-300 hover:bg-brand-green-light dark:hover:bg-gray-600'
+                    ? 'bg-brand-green text-white border-brand-green shadow'
+                    : 'bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-brand-gray-dark dark:text-gray-300 hover:border-brand-green hover:text-brand-green'
                 }`}
               >
                 {concern}
@@ -119,7 +119,7 @@ export const UserProfileForm: React.FC<UserProfileFormProps> = ({ userProfile, s
               />
               <div className="flex-shrink-0 grid grid-cols-2 gap-1">
                  {(Object.keys(SENSITIVITY_LEVELS) as Array<'high' | 'moderate'>).map(level => (
-                  <button key={level} onClick={() => setNewSensitivity(p => ({...p, level}))} className={`px-3 py-2 text-xs rounded-md ${newSensitivity.level === level ? 'bg-brand-green-dark text-white' : 'bg-white dark:bg-gray-600 text-gray-600 dark:text-gray-300'}`}>
+                  <button key={level} onClick={() => setNewSensitivity(p => ({...p, level}))} className={`px-3 py-2 text-xs rounded-md border ${newSensitivity.level === level ? 'bg-brand-green-dark text-white border-brand-green-dark' : 'bg-white dark:bg-gray-600 border-gray-200 dark:border-gray-500 text-gray-600 dark:text-gray-300'}`}>
                     {SENSITIVITY_LEVELS[level]}
                   </button>
                 ))}
@@ -149,7 +149,7 @@ export const UserProfileForm: React.FC<UserProfileFormProps> = ({ userProfile, s
             value={localProfile.healthConditions}
             onChange={(e) => setLocalProfile(p => ({ ...p, healthConditions: e.target.value }))}
             placeholder="e.g., Nut allergy, Eczema, Rosacea"
-            className="w-full px-3 py-2 bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 rounded-lg focus:ring-2 focus:ring-brand-green focus:border-transparent transition"
+            className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 rounded-lg focus:ring-2 focus:ring-brand-green focus:border-transparent transition"
           />
         </div>
         

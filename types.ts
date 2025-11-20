@@ -1,7 +1,13 @@
 
 export interface User {
   email: string;
-  name: string;
+  firstName: string;
+  lastName: string;
+  dateOfBirth?: string;
+  jobTitle?: string;
+  subscriptionStatus: 'Active' | 'Inactive';
+  bio?: string;
+  photo?: string; // Base64 string
 }
 
 export interface UserProfile {
