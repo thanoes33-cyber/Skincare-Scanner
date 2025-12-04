@@ -1,17 +1,29 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { LeafIcon } from './icons/LeafIcon';
 import { SparklesIcon } from './icons/SparklesIcon';
 import { SunIcon } from './icons/SunIcon';
 import { MoonIcon } from './icons/MoonIcon';
+import { AccessibilityIcon } from './icons/AccessibilityIcon';
+import { AccessibilityModal } from './AccessibilityModal';
+import { useAccessibility } from '../contexts/AccessibilityContext';
 
 interface LandingPageProps {
   onGetStarted: () => void;
   isDarkMode: boolean;
   toggleTheme: () => void;
+  onNavigateToAbout: () => void;
 }
 
-export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, isDarkMode, toggleTheme }) => {
+export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, isDarkMode, toggleTheme, onNavigateToAbout }) => {
+  const [isAccessibilityModalOpen, setIsAccessibilityModalOpen] = useState(false);
+  const { playClick } = useAccessibility();
+
+  const handleGetStarted = () => {
+    playClick();
+    onGetStarted();
+  };
+
   return (
     <div className="min-h-screen bg-brand-green-light dark:bg-gray-900 transition-colors duration-200 flex flex-col">
       <nav className="p-6 flex justify-between items-center max-w-7xl mx-auto w-full">
@@ -21,15 +33,24 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, isDarkMo
         </div>
         <div className="flex items-center gap-4">
             <button 
-                onClick={toggleTheme} 
-                className="p-2 rounded-full text-brand-gray-dark dark:text-gray-300 hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+                onClick={() => { toggleTheme(); playClick(); }} 
+                className="p-2 rounded-full text-brand-gray-dark dark:text-gray-300 hover:bg-black/5 dark:hover:bg-white/10 transition-colors focus:ring-2 focus:ring-brand-green focus:outline-none"
                 aria-label="Toggle dark mode"
             >
                 {isDarkMode ? <SunIcon className="h-6 w-6" /> : <MoonIcon className="h-6 w-6" />}
             </button>
+            
             <button 
-              onClick={onGetStarted}
-              className="text-brand-green-dark dark:text-brand-green-light font-semibold hover:text-brand-green transition-colors"
+                onClick={() => { setIsAccessibilityModalOpen(true); playClick(); }}
+                className="p-2 rounded-full text-brand-gray-dark dark:text-gray-300 hover:bg-black/5 dark:hover:bg-white/10 transition-colors focus:ring-2 focus:ring-brand-green focus:outline-none"
+                aria-label="Accessibility Settings"
+            >
+                <AccessibilityIcon className="h-6 w-6" />
+            </button>
+
+            <button 
+              onClick={handleGetStarted}
+              className="text-brand-green-dark dark:text-brand-green-light font-semibold hover:text-brand-green transition-colors focus:ring-2 focus:ring-brand-green focus:outline-none rounded px-2"
             >
               Log In
             </button>
@@ -53,14 +74,14 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, isDarkMo
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center mt-10">
             <button
-              onClick={onGetStarted}
-              className="px-8 py-4 bg-brand-green text-white text-lg font-bold rounded-xl shadow-lg hover:bg-brand-green-dark transform hover:-translate-y-1 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-green"
+              onClick={handleGetStarted}
+              className="px-8 py-4 bg-brand-green text-white text-lg font-bold rounded-xl shadow-lg hover:bg-brand-green-dark transform hover:-translate-y-1 transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-brand-green/50"
             >
               Get Started
             </button>
             <button
-              onClick={onGetStarted}
-              className="px-8 py-4 bg-white dark:bg-gray-800 text-brand-green-dark dark:text-brand-green-light text-lg font-bold rounded-xl shadow-md hover:bg-gray-50 dark:hover:bg-gray-700 transform hover:-translate-y-1 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-200 dark:focus:ring-gray-700"
+              onClick={handleGetStarted}
+              className="px-8 py-4 bg-white dark:bg-gray-800 text-brand-green-dark dark:text-brand-green-light text-lg font-bold rounded-xl shadow-md hover:bg-gray-50 dark:hover:bg-gray-700 transform hover:-translate-y-1 transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-gray-200 dark:focus:ring-gray-700"
             >
               Start Tracking
             </button>
@@ -81,8 +102,21 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, isDarkMo
         </div>
       </main>
 
-      <footer className="p-6 text-center text-brand-gray dark:text-gray-500 text-sm">
-        &copy; {new Date().getFullYear()} Skincare Scanner.
+      {isAccessibilityModalOpen && (
+        <AccessibilityModal 
+            isOpen={isAccessibilityModalOpen} 
+            onClose={() => setIsAccessibilityModalOpen(false)} 
+        />
+      )}
+
+      <footer className="p-6 text-center text-brand-gray dark:text-gray-500 text-sm flex flex-col items-center gap-2">
+        <p>&copy; {new Date().getFullYear()} Skincare Scanner.</p>
+        <button 
+            onClick={() => { onNavigateToAbout(); playClick(); }}
+            className="text-brand-green hover:underline underline-offset-2 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-green rounded px-2"
+        >
+            About Skincare Scanner
+        </button>
       </footer>
     </div>
   );

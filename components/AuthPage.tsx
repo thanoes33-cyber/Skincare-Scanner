@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { LeafIcon } from './icons/LeafIcon';
 import { SunIcon } from './icons/SunIcon';
@@ -31,7 +32,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLoginSuccess, onCancel, is
   const [successMessage, setSuccessMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isResetSent, setIsResetSent] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
 
   // Password Validation Logic
   const checkPasswordStrength = (pass: string) => {
@@ -47,26 +48,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLoginSuccess, onCancel, is
   const passwordReqs = checkPasswordStrength(password);
   const isPasswordValid = Object.values(passwordReqs).every(Boolean);
 
-  // Lockout Helpers
-  const getLockoutData = (emailStr: string): LockoutData => {
-      try {
-          const storage = JSON.parse(localStorage.getItem('skincare_lockouts') || '{}');
-          return storage[emailStr.toLowerCase()] || { attempts: 0 };
-      } catch {
-          return { attempts: 0 };
-      }
-  };
-
-  const updateLockoutData = (emailStr: string, data: LockoutData) => {
-      const storage = JSON.parse(localStorage.getItem('skincare_lockouts') || '{}');
-      if (data.attempts === 0 && !data.lockedUntil) {
-          delete storage[emailStr.toLowerCase()];
-      } else {
-          storage[emailStr.toLowerCase()] = data;
-      }
-      localStorage.setItem('skincare_lockouts', JSON.stringify(storage));
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -81,7 +62,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLoginSuccess, onCancel, is
         }
         setIsLoading(true);
         
-        // Simulate network request delay
+        // Simulate network request
         setTimeout(() => {
             setIsLoading(false);
             // Check existence to simulate "sending to email on account"
@@ -94,7 +75,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLoginSuccess, onCancel, is
                  setSuccessMessage(`If an account exists for ${cleanEmail}, we have sent a password reset link to it.`);
             }
             setIsResetSent(true);
-        }, 1500);
+        }, 800);
         return;
     }
 
@@ -110,36 +91,33 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLoginSuccess, onCancel, is
         }
 
         setIsLoading(true);
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        setTimeout(() => {
+            try {
+                const storedUsers = JSON.parse(localStorage.getItem('skincare_users') || '[]');
+                let userFound = false;
+                const updatedUsers = storedUsers.map((u: any) => {
+                    if ((u.email || '').trim().toLowerCase() === cleanEmail) {
+                        userFound = true;
+                        return { ...u, password: password };
+                    }
+                    return u;
+                });
 
-        try {
-            const storedUsers = JSON.parse(localStorage.getItem('skincare_users') || '[]');
-            let userFound = false;
-            const updatedUsers = storedUsers.map((u: any) => {
-                if ((u.email || '').trim().toLowerCase() === cleanEmail) {
-                    userFound = true;
-                    return { ...u, password: password };
+                if (userFound) {
+                    localStorage.setItem('skincare_users', JSON.stringify(updatedUsers));
                 }
-                return u;
-            });
 
-            if (userFound) {
-                localStorage.setItem('skincare_users', JSON.stringify(updatedUsers));
-                // Clear lockout on successful reset
-                const lockouts = JSON.parse(localStorage.getItem('skincare_lockouts') || '{}');
-                delete lockouts[cleanEmail];
-                localStorage.setItem('skincare_lockouts', JSON.stringify(lockouts));
+                setIsLoading(false);
+                setSuccessMessage('Your password has been successfully reset. Please sign in.');
+                setView('login');
+                setPassword('');
+                setConfirmPassword('');
+            } catch (err) {
+                setIsLoading(false);
+                setError('Failed to update password. Please try again.');
             }
-
-            setIsLoading(false);
-            setSuccessMessage('Your password has been successfully reset. Please sign in.');
-            setView('login');
-            setPassword('');
-            setConfirmPassword('');
-        } catch (err) {
-            setIsLoading(false);
-            setError('Failed to update password. Please try again.');
-        }
+        }, 800);
         return;
     }
 
@@ -165,102 +143,75 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLoginSuccess, onCancel, is
 
     setIsLoading(true);
 
-    // Artificial delay for realism
-    await new Promise(resolve => setTimeout(resolve, 600));
-
-    try {
-      const storedUsers = JSON.parse(localStorage.getItem('skincare_users') || '[]');
-
-      if (view === 'login') {
-        // 1. Check Lockout Status
-        const lockout = getLockoutData(cleanEmail);
-        if (lockout.lockedUntil && lockout.lockedUntil > Date.now()) {
-            const minutesLeft = Math.ceil((lockout.lockedUntil - Date.now()) / 60000);
-            setIsLoading(false);
-            setError(`Account locked due to multiple failed attempts. Please try again in ${minutesLeft} minutes.`);
-            return;
-        } else if (lockout.lockedUntil && lockout.lockedUntil <= Date.now()) {
-            // Reset lockout if time expired
-            updateLockoutData(cleanEmail, { attempts: 0 });
-        }
-
-        // 2. Check Credentials
-        const user = storedUsers.find((u: any) => 
-            u.email && u.email.trim().toLowerCase() === cleanEmail && u.password === password
-        );
-
-        if (user) {
-          // Successful Login
-          updateLockoutData(cleanEmail, { attempts: 0 }); // Clear failures
-          
-          const userObj: User = {
-              email: user.email,
-              firstName: user.firstName || user.name?.split(' ')[0] || 'User',
-              lastName: user.lastName || user.name?.split(' ').slice(1).join(' ') || '',
-              subscriptionStatus: user.subscriptionStatus || 'Active',
-              bio: user.bio || '',
-              photo: user.photo || '',
-              dateOfBirth: user.dateOfBirth,
-              jobTitle: user.jobTitle
-          };
-          setIsLoading(false);
-          onLoginSuccess(userObj, rememberMe);
-        } else {
-          // Failed Login
-          setIsLoading(false);
-          
-          const newAttempts = (lockout.attempts || 0) + 1;
-          const maxAttempts = 3;
-          
-          if (newAttempts >= maxAttempts) {
-              const lockDuration = 15 * 60 * 1000; // 15 mins
-              updateLockoutData(cleanEmail, { attempts: newAttempts, lockedUntil: Date.now() + lockDuration });
-              setError('Account locked due to too many failed attempts. Try again in 15 minutes.');
-          } else {
-              updateLockoutData(cleanEmail, { attempts: newAttempts });
-              setError(`Invalid credentials. You have ${maxAttempts - newAttempts} attempt(s) remaining before lockout.`);
-          }
-        }
-      } else {
-        // Sign Up Flow
-        const existingUser = storedUsers.find((u: any) => (u.email || '').trim().toLowerCase() === cleanEmail);
-        
-        if (existingUser) {
-          setIsLoading(false);
-          setError('An account with this email already exists. Please log in.');
-          return;
-        }
-        
-        const newUser: any = { 
-            email: cleanEmail, 
-            password, 
-            firstName: cleanFirstName,
-            lastName: cleanLastName,
-            subscriptionStatus: 'Active',
-            bio: '',
-            photo: '',
-            name: `${cleanFirstName} ${cleanLastName}`
-        };
-
+    setTimeout(() => {
         try {
-            const updatedUsers = [...storedUsers, newUser];
-            localStorage.setItem('skincare_users', JSON.stringify(updatedUsers));
+          const storedUsers = JSON.parse(localStorage.getItem('skincare_users') || '[]');
+
+          if (view === 'login') {
+            // 2. Check Credentials
+            const user = storedUsers.find((u: any) => 
+                u.email && u.email.trim().toLowerCase() === cleanEmail && u.password === password
+            );
+
+            if (user) {
+              // Successful Login
+              const userObj: User = {
+                  email: user.email,
+                  firstName: user.firstName || user.name?.split(' ')[0] || 'User',
+                  lastName: user.lastName || user.name?.split(' ').slice(1).join(' ') || '',
+                  subscriptionStatus: user.subscriptionStatus || 'Active',
+                  bio: user.bio || '',
+                  photo: user.photo || '',
+                  dateOfBirth: user.dateOfBirth,
+              };
+              setIsLoading(false);
+              onLoginSuccess(userObj, rememberMe);
+            } else {
+              // Failed Login
+              setIsLoading(false);
+              setError(`Invalid credentials.`);
+            }
+          } else {
+            // Sign Up Flow
+            const existingUser = storedUsers.find((u: any) => (u.email || '').trim().toLowerCase() === cleanEmail);
             
-            setIsLoading(false);
-            const { password: _, name: __, ...userProfile } = newUser;
-            // Use the rememberMe state selected by the user
-            onLoginSuccess(userProfile as User, rememberMe);
-        } catch (storageError) {
-            setIsLoading(false);
-            console.error("Storage Error:", storageError);
-            setError("Failed to save account. Your device storage might be full.");
+            if (existingUser) {
+              setIsLoading(false);
+              setError('An account with this email already exists. Please log in.');
+              return;
+            }
+            
+            const newUser: any = { 
+                email: cleanEmail, 
+                password, 
+                firstName: cleanFirstName,
+                lastName: cleanLastName,
+                subscriptionStatus: 'Active',
+                bio: '',
+                photo: '',
+                name: `${cleanFirstName} ${cleanLastName}`
+            };
+
+            try {
+                const updatedUsers = [...storedUsers, newUser];
+                localStorage.setItem('skincare_users', JSON.stringify(updatedUsers));
+                
+                setIsLoading(false);
+                const { password: _, name: __, ...userProfile } = newUser;
+                // Use the rememberMe state selected by the user
+                onLoginSuccess(userProfile as User, rememberMe);
+            } catch (storageError) {
+                setIsLoading(false);
+                console.error("Storage Error:", storageError);
+                setError("Failed to save account. Your device storage might be full.");
+            }
+          }
+        } catch (err) {
+          setIsLoading(false);
+          console.error("Authentication Error:", err);
+          setError("Unable to access local storage. Please enable cookies/storage.");
         }
-      }
-    } catch (err) {
-      setIsLoading(false);
-      console.error("Authentication Error:", err);
-      setError("Unable to access local storage. Please enable cookies/storage.");
-    }
+    }, 800);
   };
 
   const RequirementItem = ({ met, text }: { met: boolean; text: string }) => (

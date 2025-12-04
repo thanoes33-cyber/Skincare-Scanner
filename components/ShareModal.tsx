@@ -28,8 +28,8 @@ const InstagramIcon = () => (
 const GmailIcon = () => (
   <svg fill="currentColor" viewBox="0 0 24 24" className="w-6 h-6"><path d="M24 5.457v13.909c0 .904-.732 1.636-1.636 1.636h-3.819V11.73L12 16.64l-6.545-4.91v9.273H1.636A1.636 1.636 0 0 1 0 19.366V5.457c0-2.023 2.309-3.178 3.927-1.964L5.455 4.64 12 9.548l6.545-4.91 1.528-1.145C21.69 2.28 24 3.434 24 5.457z" /></svg>
 );
-const YahooIcon = () => (
-  <svg fill="currentColor" viewBox="0 0 24 24" className="w-6 h-6"><path d="M22.4 6.1l-6.9 15.6h-3.1l2.3-5.1-6.4-10.6h3.4l4.5 7.9 4.2-7.9h2z"/></svg>
+const EmailIcon = () => (
+  <svg fill="currentColor" viewBox="0 0 24 24" className="w-6 h-6"><path d="M1.5 8.67v8.58a3 3 0 003 3h15a3 3 0 003-3V8.67l-8.928 5.493a3 3 0 01-3.144 0L1.5 8.67z" /><path d="M22.5 6.908V6.75a3 3 0 00-3-3h-15a3 3 0 00-3 3v.158l9.714 5.978a1.5 1.5 0 001.572 0L22.5 6.908z" /></svg>
 );
 
 export const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, data }) => {
@@ -109,25 +109,25 @@ export const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, data })
       onClick: undefined
     },
     {
+        name: 'Instagram',
+        icon: <InstagramIcon />,
+        color: 'bg-gradient-to-br from-purple-600 to-orange-500 hover:opacity-90',
+        href: undefined,
+        onClick: handleCopyForInstagram
+    },
+    {
+        name: 'Email',
+        icon: <EmailIcon />,
+        color: 'bg-gray-600 hover:bg-gray-700',
+        href: `mailto:?subject=${encodedTitle}&body=${fullBody}`,
+        onClick: undefined
+    },
+    {
         name: 'Gmail',
         icon: <GmailIcon />,
         color: 'bg-red-500 hover:bg-red-600',
         href: `https://mail.google.com/mail/?view=cm&fs=1&su=${encodedTitle}&body=${fullBody}`,
         onClick: undefined
-    },
-    {
-        name: 'Yahoo',
-        icon: <YahooIcon />,
-        color: 'bg-purple-600 hover:bg-purple-700',
-        href: `http://compose.mail.yahoo.com/?subject=${encodedTitle}&body=${fullBody}`,
-        onClick: undefined
-    },
-    {
-        name: 'Instagram',
-        icon: <InstagramIcon />,
-        color: 'bg-gradient-to-br from-purple-600 to-orange-500 hover:opacity-90',
-        href: undefined, // Web share to IG not possible via link
-        onClick: handleCopyForInstagram
     }
   ];
 
@@ -135,36 +135,45 @@ export const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, data })
     <div 
         className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in"
         onClick={onClose}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="share-title"
     >
       <div 
         className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-sm p-6 relative animate-slide-up"
         onClick={e => e.stopPropagation()}
       >
         <div className="flex justify-between items-center mb-6">
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white">Share Analysis</h3>
-            <button onClick={onClose} className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+            <h3 id="share-title" className="text-lg font-bold text-gray-900 dark:text-white">Share Analysis</h3>
+            <button 
+                onClick={onClose} 
+                className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-green"
+                aria-label="Close"
+            >
                 <XMarkIcon className="w-6 h-6 text-gray-500" />
             </button>
         </div>
 
-        <div className="grid grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-3 gap-4 mb-6">
             {shareLinks.map((link) => (
-                <div key={link.name} className="flex flex-col items-center gap-2">
+                <div key={link.name} className="flex flex-col items-center gap-2 group">
                     {link.href ? (
                         <a 
                             href={link.href}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className={`w-12 h-12 flex items-center justify-center rounded-full text-white transition-transform transform hover:scale-110 shadow-md ${link.color}`}
+                            className={`w-12 h-12 flex items-center justify-center rounded-full text-white transition-transform transform group-hover:scale-110 shadow-md ${link.color} focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-green`}
                             title={`Share to ${link.name}`}
+                            aria-label={`Share to ${link.name}`}
                         >
                             {link.icon}
                         </a>
                     ) : (
                         <button
                             onClick={link.onClick}
-                            className={`w-12 h-12 flex items-center justify-center rounded-full text-white transition-transform transform hover:scale-110 shadow-md ${link.color}`}
+                            className={`w-12 h-12 flex items-center justify-center rounded-full text-white transition-transform transform group-hover:scale-110 shadow-md ${link.color} focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-green`}
                             title={`Share to ${link.name}`}
+                            aria-label={`Share to ${link.name}`}
                         >
                              {link.icon}
                         </button>
@@ -177,7 +186,8 @@ export const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, data })
         <div className="space-y-3">
             <button
                 onClick={handleCopyLink}
-                className="w-full flex items-center justify-between p-3 rounded-xl bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors group"
+                className="w-full flex items-center justify-between p-3 rounded-xl bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors group focus:outline-none focus:ring-2 focus:ring-brand-green"
+                aria-label="Copy Link to Clipboard"
             >
                 <div className="flex items-center">
                     <LinkIcon className="w-5 h-5 mr-3 text-gray-500 dark:text-gray-400 group-hover:text-brand-green" />
@@ -189,7 +199,8 @@ export const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, data })
             {canShareNative && (
                 <button
                     onClick={handleNativeShare}
-                    className="w-full flex items-center justify-center p-3 rounded-xl bg-brand-green/10 text-brand-green font-semibold hover:bg-brand-green hover:text-white transition-all"
+                    className="w-full flex items-center justify-center p-3 rounded-xl bg-brand-green/10 text-brand-green font-semibold hover:bg-brand-green hover:text-white transition-all focus:outline-none focus:ring-2 focus:ring-brand-green"
+                    aria-label="More sharing options"
                 >
                     <ShareIcon className="w-5 h-5 mr-2" />
                     More Options...
@@ -198,8 +209,8 @@ export const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, data })
         </div>
         
         {toastMessage && (
-            <div className="absolute bottom-2 left-0 w-full flex justify-center pointer-events-none">
-                <div className="bg-black/80 text-white text-xs px-4 py-2 rounded-full backdrop-blur-md shadow-lg animate-slide-up">
+            <div className="absolute bottom-4 left-0 w-full flex justify-center pointer-events-none px-4">
+                <div className="bg-black/80 text-white text-xs px-4 py-2 rounded-full backdrop-blur-md shadow-lg animate-slide-up text-center">
                     {toastMessage}
                 </div>
             </div>

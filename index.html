@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -53,6 +54,71 @@
       .dark select:-webkit-autofill:focus {
          -webkit-box-shadow: 0 0 0px 1000px #374151 inset !important;
          -webkit-text-fill-color: white !important;
+      }
+
+      /* Accessibility: Text Scaling */
+      html.text-size-lg { font-size: 112.5%; } /* 18px base */
+      html.text-size-xl { font-size: 125%; }   /* 20px base */
+      html.text-size-2xl { font-size: 150%; }  /* 24px base */
+
+      /* Accessibility: Reduced Motion */
+      body.reduced-motion *, body.reduced-motion *::before, body.reduced-motion *::after {
+          animation-duration: 0.01ms !important;
+          animation-iteration-count: 1 !important;
+          transition-duration: 0.01ms !important;
+          scroll-behavior: auto !important;
+      }
+
+      /* Accessibility: High Contrast Mode */
+      body.high-contrast {
+          background-color: #ffffff !important;
+          color: #000000 !important;
+      }
+      body.high-contrast.dark {
+          background-color: #000000 !important;
+          color: #ffffff !important;
+      }
+      body.high-contrast * {
+          border-color: currentColor !important;
+      }
+      /* Force higher contrast backgrounds for cards in HC mode */
+      body.high-contrast .bg-white, 
+      body.high-contrast .bg-gray-50,
+      body.high-contrast .bg-gray-100 {
+          background-color: #ffffff !important;
+          border: 2px solid #000000 !important;
+      }
+      body.high-contrast.dark .bg-gray-800,
+      body.high-contrast.dark .bg-gray-700,
+      body.high-contrast.dark .bg-gray-900 {
+          background-color: #000000 !important;
+          border: 2px solid #ffffff !important;
+      }
+      /* Ensure text is always visible in HC */
+      body.high-contrast .text-gray-500,
+      body.high-contrast .text-gray-600,
+      body.high-contrast .text-brand-gray {
+          color: inherit !important;
+      }
+      body.high-contrast button {
+          border: 3px solid currentColor !important;
+          font-weight: 800 !important;
+      }
+      body.high-contrast .bg-brand-green {
+          background-color: transparent !important;
+          color: #000000 !important;
+          border: 3px solid #000000 !important;
+      }
+      body.high-contrast.dark .bg-brand-green {
+          color: #ffffff !important;
+          border-color: #ffffff !important;
+      }
+      /* Highlight focus in HC */
+      body.high-contrast *:focus {
+          outline: 4px solid #FFFF00 !important;
+          outline-offset: 2px !important;
+          background-color: #FFFF00 !important;
+          color: #000000 !important;
       }
     </style>
   <script type="importmap">

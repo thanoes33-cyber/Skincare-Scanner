@@ -1,5 +1,5 @@
 
-import { GoogleGenAI, Type, Modality } from "@google/genai";
+import { GoogleGenAI, Type, Modality, Chat } from "@google/genai";
 import type { UserProfile } from '../types';
 
 const fileToGenerativePart = async (file: File) => {
@@ -328,4 +328,31 @@ export const findProductImage = async (productName: string) => {
     console.error("Error finding product image:", error);
     return null;
   }
+};
+
+export const createChatSession = (userProfile: UserProfile): Chat => {
+  if (!process.env.API_KEY) throw new Error("API key is not configured.");
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  
+  const systemInstruction = `You are a friendly and expert skincare consultant for the "Skincare Scanner" app.
+  
+  User Profile:
+  - Skin Type: ${userProfile.skinType}
+  - Concerns: ${userProfile.skinConcerns.join(', ') || 'None'}
+  - Health Conditions: ${userProfile.healthConditions || 'None'}
+  - Sensitivities: ${Object.keys(userProfile.ingredientSensitivities).length > 0 ? 
+      Object.entries(userProfile.ingredientSensitivities).map(([k, v]) => `${k} (${v})`).join(', ') : 'None'}
+
+  Your goal is to help the user understand skincare, ingredients, and products tailored to their specific needs and sensitivities. 
+  - Be encouraging and concise.
+  - If a user asks about a product, analyze it based on their profile.
+  - Warn them about their specific sensitivities if relevant.
+  - Do not give medical advice; suggest consulting a dermatologist for serious issues.`;
+
+  return ai.chats.create({
+    model: 'gemini-3-pro-preview',
+    config: {
+      systemInstruction: systemInstruction,
+    }
+  });
 };

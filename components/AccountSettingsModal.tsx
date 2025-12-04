@@ -147,7 +147,7 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({ user
               />
               <p className="text-xs text-gray-500 mt-1">Email cannot be changed as it is your account ID.</p>
             </div>
-            <div>
+            <div className="md:col-span-2">
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Date of Birth</label>
               <input
                 type="date"
@@ -157,30 +157,6 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({ user
                 autoComplete="bday"
                 className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-green focus:outline-none"
               />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Job Title</label>
-              <input
-                type="text"
-                name="jobTitle"
-                value={formData.jobTitle || ''}
-                onChange={handleChange}
-                autoComplete="organization-title"
-                placeholder="e.g., Dermatologist, Student"
-                className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-green focus:outline-none"
-              />
-            </div>
-            <div>
-               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Online/Offline</label>
-               <select
-                  name="subscriptionStatus"
-                  value={formData.subscriptionStatus}
-                  onChange={handleChange}
-                  className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-green focus:outline-none"
-               >
-                 <option value="Active">Online</option>
-                 <option value="Inactive">Offline</option>
-               </select>
             </div>
              <div className="md:col-span-2">
               <div className="flex justify-between">

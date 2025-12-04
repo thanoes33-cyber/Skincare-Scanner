@@ -70,12 +70,12 @@ export const UserProfileForm: React.FC<UserProfileFormProps> = ({ userProfile, s
       <div className="space-y-6">
         <div>
           <label className="block text-sm font-semibold text-brand-gray-dark dark:text-gray-300 mb-2">Skin Type</label>
-          <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+          <div className="flex flex-wrap gap-2">
             {SKIN_TYPES.map(type => (
               <button
                 key={type}
                 onClick={() => setLocalProfile(p => ({ ...p, skinType: type }))}
-                className={`px-3 py-2 text-sm font-medium rounded-full transition-colors duration-200 border ${
+                className={`px-4 py-2 text-sm font-medium rounded-full transition-colors duration-200 border flex-shrink-0 whitespace-nowrap ${
                   localProfile.skinType === type
                     ? 'bg-brand-green text-white border-brand-green shadow'
                     : 'bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-brand-gray-dark dark:text-gray-300 hover:border-brand-green hover:text-brand-green'
@@ -94,7 +94,7 @@ export const UserProfileForm: React.FC<UserProfileFormProps> = ({ userProfile, s
               <button
                 key={concern}
                 onClick={() => handleConcernToggle(concern)}
-                className={`px-4 py-1.5 text-sm font-medium rounded-full transition-colors duration-200 border ${
+                className={`px-4 py-1.5 text-sm font-medium rounded-full transition-colors duration-200 border flex-shrink-0 whitespace-nowrap ${
                   localProfile.skinConcerns.includes(concern)
                     ? 'bg-brand-green text-white border-brand-green shadow'
                     : 'bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-brand-gray-dark dark:text-gray-300 hover:border-brand-green hover:text-brand-green'
@@ -109,23 +109,42 @@ export const UserProfileForm: React.FC<UserProfileFormProps> = ({ userProfile, s
         <div>
           <label className="block text-sm font-semibold text-brand-gray-dark dark:text-gray-300 mb-2">Ingredient Sensitivities</label>
           <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg transition-colors duration-200">
-            <div className="flex flex-col sm:flex-row gap-2">
+            {/* Improved layout for responsiveness */}
+            <div className="flex flex-col md:flex-row gap-3">
               <input 
                 type="text"
                 placeholder="e.g., Linalool"
                 value={newSensitivity.ingredient}
                 onChange={e => setNewSensitivity(p => ({...p, ingredient: e.target.value}))}
-                className="flex-grow px-3 py-2 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 rounded-lg focus:ring-2 focus:ring-brand-green focus:border-transparent transition"
+                className="flex-grow px-3 py-2 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 rounded-lg focus:ring-2 focus:ring-brand-green focus:border-transparent transition min-w-[120px]"
               />
-              <div className="flex-shrink-0 grid grid-cols-2 gap-1">
-                 {(Object.keys(SENSITIVITY_LEVELS) as Array<'high' | 'moderate'>).map(level => (
-                  <button key={level} onClick={() => setNewSensitivity(p => ({...p, level}))} className={`px-3 py-2 text-xs rounded-md border ${newSensitivity.level === level ? 'bg-brand-green-dark text-white border-brand-green-dark' : 'bg-white dark:bg-gray-600 border-gray-200 dark:border-gray-500 text-gray-600 dark:text-gray-300'}`}>
-                    {SENSITIVITY_LEVELS[level]}
-                  </button>
-                ))}
+              
+              <div className="flex items-center gap-2 flex-shrink-0">
+                 <div className="flex gap-1 bg-white dark:bg-gray-600 p-1 rounded-lg border border-gray-200 dark:border-gray-500">
+                    {(Object.keys(SENSITIVITY_LEVELS) as Array<'high' | 'moderate'>).map(level => (
+                      <button 
+                        key={level} 
+                        onClick={() => setNewSensitivity(p => ({...p, level}))} 
+                        className={`px-3 py-1.5 text-xs font-medium whitespace-nowrap rounded-md transition-all ${
+                            newSensitivity.level === level 
+                            ? 'bg-brand-green text-white shadow-sm' 
+                            : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-500'
+                        }`}
+                      >
+                        {level === 'high' ? 'High' : 'Mod'}
+                      </button>
+                    ))}
+                 </div>
+                 <button 
+                    onClick={handleAddSensitivity} 
+                    disabled={!newSensitivity.ingredient.trim()}
+                    className="px-4 py-2 bg-brand-green text-white font-semibold rounded-lg hover:bg-brand-green-dark disabled:opacity-50 disabled:cursor-not-allowed transition"
+                 >
+                    Add
+                 </button>
               </div>
-               <button onClick={handleAddSensitivity} className="px-4 py-2 bg-brand-green text-white font-semibold rounded-lg hover:bg-brand-green-dark transition">Add</button>
             </div>
+
              <div className="flex flex-wrap gap-2 mt-3">
               {Object.entries(localProfile.ingredientSensitivities || {}).map(([key, value]) => (
                 <span key={key} className={`flex items-center text-xs font-medium pl-3 pr-2 py-1 rounded-full ${value === 'high' ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-200' : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-200'}`}>
