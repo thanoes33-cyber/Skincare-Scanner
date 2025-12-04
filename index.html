@@ -22,6 +22,23 @@
                 DEFAULT: '#6B7280',
                 dark: '#374151',
               }
+            },
+            animation: {
+              'scan-line': 'scan-line 2.5s linear infinite',
+              'flash': 'flash 0.5s ease-out',
+              'ping-once': 'ping 1s cubic-bezier(0, 0, 0.2, 1) 1',
+            },
+            keyframes: {
+              'scan-line': {
+                '0%': { top: '0%', opacity: '0' },
+                '10%': { opacity: '1' },
+                '90%': { opacity: '1' },
+                '100%': { top: '100%', opacity: '0' },
+              },
+              'flash': {
+                '0%': { opacity: '0.8' },
+                '100%': { opacity: '0' },
+              }
             }
           }
         }
