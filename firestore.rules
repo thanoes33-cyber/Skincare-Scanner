@@ -1,0 +1,175 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: {userId}
+    // Fields:
+    //   - uid: string (required, immutable)
+    //   - firstName: string (optional, max 100)
+    //   - lastName: string (optional, max 100)
+    //   - email: string (required, valid email)
+    //   - photo: string (optional, URL)
+    //   - dateOfBirth: string (optional)
+    //   - bio: string (optional, max 1000)
+    //   - skinType: string (optional)
+    //   - skinConcerns: list of strings (optional)
+    //   - healthConditions: string (optional)
+    //   - ingredientSensitivities: map (optional)
+    //   - createdAt: number (required, immutable)
+    //   - updatedAt: number (required)
+    //
+    // Collection: scanHistory
+    // Document ID: {historyId}
+    // Fields:
+    //   - uid: string (required, immutable)
+    //   - id: string (required, immutable)
+    //   - timestamp: number (required, immutable)
+    //   - productName: string (required, max 500)
+    //   - thumbnail: string (optional)
+    //   - result: string (required, JSON stringified AnalysisResult)
+    //   - favorite: boolean (optional)
+    //
+    // Collection: activities
+    // Document ID: {activityId}
+    // Fields:
+    //   - uid: string (required, immutable)
+    //   - id: string (required, immutable)
+    //   - type: string (required, in ['scan', 'routine', 'note'])
+    //   - title: string (required, max 200)
+    //   - details: string (optional, max 1000)
+    //   - timestamp: number (required)
+    //   - durationMinutes: number (optional)
+    //   - notes: string (optional, max 2000)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isDocOwner() {
+      return isAuthenticated() && request.auth.uid == resource.data.uid;
+    }
+
+    function uidUnchanged() {
+      return !('uid' in request.resource.data) || request.resource.data.uid == request.auth.uid;
+    }
+
+    function uidNotModified() {
+      return !('uid' in request.resource.data) || request.resource.data.uid == resource.data.uid;
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function isValidStringLength(field, minLen, maxLen) {
+      return request.resource.data[field] is string &&
+        request.resource.data[field].size() >= minLen &&
+        request.resource.data[field].size() <= maxLen;
+    }
+
+    function isValidOptionalString(field, minLen, maxLen) {
+      return !(field in request.resource.data) ||
+             (request.resource.data[field] is string &&
+              request.resource.data[field].size() >= minLen &&
+              request.resource.data[field].size() <= maxLen);
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function areImmutableFieldsUnchanged(fields) {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(fields);
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+    function isValidUser() {
+      let data = request.resource.data;
+      return hasRequiredFields(['uid', 'email', 'createdAt', 'updatedAt']) &&
+             data.uid == request.auth.uid &&
+             isValidEmail(data.email) &&
+             data.createdAt is number &&
+             data.updatedAt is number &&
+             isValidOptionalString('firstName', 0, 100) &&
+             isValidOptionalString('lastName', 0, 100) &&
+             isValidOptionalString('photo', 0, 2000) &&
+             isValidOptionalString('dateOfBirth', 0, 50) &&
+             isValidOptionalString('bio', 0, 1000) &&
+             isValidOptionalString('skinType', 0, 100) &&
+             isValidOptionalString('healthConditions', 0, 1000) &&
+             (!( 'skinConcerns' in data ) || (data.skinConcerns is list && data.skinConcerns.size() <= 50)) &&
+             (!( 'ingredientSensitivities' in data ) || data.ingredientSensitivities is map);
+    }
+
+    function isValidScanHistoryItem() {
+      let data = request.resource.data;
+      return hasRequiredFields(['uid', 'id', 'timestamp', 'productName', 'result']) &&
+             data.uid == request.auth.uid &&
+             data.id is string && data.id.size() > 0 && data.id.size() <= 100 &&
+             data.timestamp is number &&
+             isValidStringLength('productName', 1, 500) &&
+             isValidOptionalString('thumbnail', 0, 500000) &&
+             data.result is string && data.result.size() <= 500000 && // 500KB limit for JSON
+             (!( 'favorite' in data ) || data.favorite is bool);
+    }
+
+    function isValidActivityItem() {
+      let data = request.resource.data;
+      return hasRequiredFields(['uid', 'id', 'type', 'title', 'timestamp']) &&
+             data.uid == request.auth.uid &&
+             data.id is string && data.id.size() > 0 && data.id.size() <= 100 &&
+             data.type in ['scan', 'routine', 'note'] &&
+             isValidStringLength('title', 1, 1000) &&
+             isValidOptionalString('details', 0, 1000) &&
+             data.timestamp is number &&
+             (!( 'durationMinutes' in data ) || data.durationMinutes is number) &&
+             isValidOptionalString('notes', 0, 2000);
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidUser() && uidUnchanged();
+      allow update: if isOwner(userId) && isValidUser() && uidNotModified() && areImmutableFieldsUnchanged(['uid', 'createdAt']);
+      allow delete: if isOwner(userId);
+    }
+
+    match /scanHistory/{historyId} {
+      allow read: if isDocOwner();
+      allow create: if isAuthenticated() && isValidScanHistoryItem() && uidUnchanged();
+      allow update: if isDocOwner() && isValidScanHistoryItem() && uidNotModified() && areImmutableFieldsUnchanged(['uid', 'id', 'timestamp']);
+      allow delete: if isDocOwner();
+    }
+
+    match /activities/{activityId} {
+      allow read: if isDocOwner();
+      allow create: if isAuthenticated() && isValidActivityItem() && uidUnchanged();
+      allow update: if isDocOwner() && isValidActivityItem() && uidNotModified() && areImmutableFieldsUnchanged(['uid', 'id']);
+      allow delete: if isDocOwner();
+    }
+    
+    // Test connection document
+    match /test/connection {
+      allow read: if true;
+      allow write: if false;
+    }
+  }
+}

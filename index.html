@@ -1,0 +1,171 @@
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Skincare Scanner</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            colors: {
+              'brand-green': {
+                light: '#E6F2E6',
+                DEFAULT: '#4CAF50',
+                dark: '#388E3C',
+              },
+              'brand-gray': {
+                light: '#F5F5F5',
+                DEFAULT: '#6B7280',
+                dark: '#374151',
+              }
+            },
+            animation: {
+              'scan-line': 'scan-line 2.5s linear infinite',
+              'flash': 'flash 0.5s ease-out',
+              'ping-once': 'ping 1s cubic-bezier(0, 0, 0.2, 1) 1',
+            },
+            keyframes: {
+              'scan-line': {
+                '0%': { top: '0%', opacity: '0' },
+                '10%': { opacity: '1' },
+                '90%': { opacity: '1' },
+                '100%': { top: '100%', opacity: '0' },
+              },
+              'flash': {
+                '0%': { opacity: '0.8' },
+                '100%': { opacity: '0' },
+              }
+            }
+          }
+        }
+      }
+    </script>
+    <script>
+      if (localStorage.getItem('skincare_theme') === 'dark' || (!('skincare_theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+    </script>
+    <style>
+      body {
+        overscroll-behavior: none;
+      }
+      button, [role="tab"] {
+        user-select: none;
+        -webkit-user-select: none;
+      }
+      /* Override browser default autofill background color */
+      input:-webkit-autofill,
+      input:-webkit-autofill:hover,
+      input:-webkit-autofill:focus,
+      textarea:-webkit-autofill,
+      textarea:-webkit-autofill:hover,
+      textarea:-webkit-autofill:focus,
+      select:-webkit-autofill,
+      select:-webkit-autofill:hover,
+      select:-webkit-autofill:focus {
+        -webkit-box-shadow: 0 0 0px 1000px #ffffff inset !important;
+        -webkit-text-fill-color: #111827 !important;
+        transition: background-color 5000s ease-in-out 0s;
+      }
+      
+      .dark input:-webkit-autofill,
+      .dark input:-webkit-autofill:hover,
+      .dark input:-webkit-autofill:focus,
+      .dark textarea:-webkit-autofill,
+      .dark textarea:-webkit-autofill:hover,
+      .dark textarea:-webkit-autofill:focus,
+      .dark select:-webkit-autofill,
+      .dark select:-webkit-autofill:hover,
+      .dark select:-webkit-autofill:focus {
+         -webkit-box-shadow: 0 0 0px 1000px #374151 inset !important;
+         -webkit-text-fill-color: white !important;
+      }
+
+      /* Accessibility: Text Scaling */
+      html.text-size-lg { font-size: 112.5%; } /* 18px base */
+      html.text-size-xl { font-size: 125%; }   /* 20px base */
+      html.text-size-2xl { font-size: 150%; }  /* 24px base */
+
+      /* Accessibility: Reduced Motion */
+      body.reduced-motion *, body.reduced-motion *::before, body.reduced-motion *::after {
+          animation-duration: 0.01ms !important;
+          animation-iteration-count: 1 !important;
+          transition-duration: 0.01ms !important;
+          scroll-behavior: auto !important;
+      }
+
+      /* Accessibility: High Contrast Mode */
+      body.high-contrast {
+          background-color: #ffffff !important;
+          color: #000000 !important;
+      }
+      body.high-contrast.dark {
+          background-color: #000000 !important;
+          color: #ffffff !important;
+      }
+      body.high-contrast * {
+          border-color: currentColor !important;
+      }
+      /* Force higher contrast backgrounds for cards in HC mode */
+      body.high-contrast .bg-white, 
+      body.high-contrast .bg-gray-50,
+      body.high-contrast .bg-gray-100 {
+          background-color: #ffffff !important;
+          border: 2px solid #000000 !important;
+      }
+      body.high-contrast.dark .bg-gray-800,
+      body.high-contrast.dark .bg-gray-700,
+      body.high-contrast.dark .bg-gray-900 {
+          background-color: #000000 !important;
+          border: 2px solid #ffffff !important;
+      }
+      /* Ensure text is always visible in HC */
+      body.high-contrast .text-gray-500,
+      body.high-contrast .text-gray-600,
+      body.high-contrast .text-brand-gray {
+          color: inherit !important;
+      }
+      body.high-contrast button {
+          border: 3px solid currentColor !important;
+          font-weight: 800 !important;
+      }
+      body.high-contrast .bg-brand-green {
+          background-color: transparent !important;
+          color: #000000 !important;
+          border: 3px solid #000000 !important;
+      }
+      body.high-contrast.dark .bg-brand-green {
+          color: #ffffff !important;
+          border-color: #ffffff !important;
+      }
+      /* Highlight focus in HC */
+      body.high-contrast *:focus {
+          outline: 4px solid #FFFF00 !important;
+          outline-offset: 2px !important;
+          background-color: #FFFF00 !important;
+          color: #000000 !important;
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.29.1",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body class="bg-brand-gray-light dark:bg-gray-900 transition-colors duration-200">
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>

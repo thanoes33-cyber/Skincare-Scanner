@@ -1,0 +1,70 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile information",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "firstName": { "type": "string" },
+        "lastName": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "photo": { "type": "string" },
+        "dateOfBirth": { "type": "string" },
+        "bio": { "type": "string" },
+        "skinType": { "type": "string" },
+        "skinConcerns": { "type": "array", "items": { "type": "string" } },
+        "healthConditions": { "type": "string" },
+        "ingredientSensitivities": { "type": "object" },
+        "createdAt": { "type": "number" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["uid", "email"]
+    },
+    "ScanHistoryItem": {
+      "title": "ScanHistoryItem",
+      "description": "A scanned product history item",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "id": { "type": "string" },
+        "timestamp": { "type": "number" },
+        "productName": { "type": "string" },
+        "thumbnail": { "type": "string" },
+        "result": { "type": "string", "description": "JSON stringified AnalysisResult" },
+        "favorite": { "type": "boolean" }
+      },
+      "required": ["uid", "id", "timestamp", "productName", "result"]
+    },
+    "ActivityItem": {
+      "title": "ActivityItem",
+      "description": "User activity log",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "id": { "type": "string" },
+        "type": { "type": "string", "enum": ["scan", "routine", "note"] },
+        "title": { "type": "string" },
+        "details": { "type": "string" },
+        "timestamp": { "type": "number" },
+        "durationMinutes": { "type": "number" },
+        "notes": { "type": "string" }
+      },
+      "required": ["uid", "id", "type", "title", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "Stores user profiles"
+    },
+    "/scanHistory/{historyId}": {
+      "schema": { "$ref": "#/entities/ScanHistoryItem" },
+      "description": "Stores scan history items"
+    },
+    "/activities/{activityId}": {
+      "schema": { "$ref": "#/entities/ActivityItem" },
+      "description": "Stores user activities"
+    }
+  }
+}
